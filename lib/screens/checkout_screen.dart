@@ -141,6 +141,50 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         return;
       }
 
+      // Ask for confirmation to avoid misidentification
+      final confirmed =
+          await showDialog<bool>(
+            context: context,
+            builder:
+                (context) => AlertDialog(
+                  title: Text('Confirm Identity'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Recognized as: ${bestEmployee?.name ?? 'Unknown'}'),
+                      SizedBox(height: 4),
+                      Text(
+                        'Employee ID: ${bestEmployee?.id ?? '-'}',
+                        style: TextStyle(color: Colors.black54, fontSize: 12),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Match score: ${bestScore.toStringAsFixed(3)}',
+                        style: TextStyle(color: Colors.black45, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Text('Not me'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: Text('Yes, proceed'),
+                    ),
+                  ],
+                ),
+          ) ??
+          false;
+      if (!confirmed) {
+        _showError(
+          'Check-out cancelled. Face did not match the correct person.',
+        );
+        return;
+      }
+
       // Check if this employee has checked in today
       print(
         '🔍 Checking existing check-in for employee: ${bestEmployee.id} (${bestEmployee.name})',

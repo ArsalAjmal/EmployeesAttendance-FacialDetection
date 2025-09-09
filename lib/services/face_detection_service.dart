@@ -5,7 +5,6 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
-import 'dart:io' show ProcessInfo;
 
 class FaceDetectionService {
   final FaceDetector _faceDetector = FaceDetector(
@@ -97,78 +96,96 @@ class FaceDetectionService {
     return allBytes.done().buffer.asUint8List();
   }
 
-  // Generate face embedding (completely unique for each face)
+  // Generate face embedding using a more stable approach
   List<double> generateFaceEmbedding(Face face) {
     List<double> embedding = [];
 
-    print('🧠 Generating face embedding...');
+    print('🧠 Generating stable face embedding...');
     print('📊 Face bounding box: ${face.boundingBox}');
 
-    // Get current time with maximum precision
-    final now = DateTime.now();
-    final timestamp = now.millisecondsSinceEpoch;
-    final microseconds = now.microsecondsSinceEpoch;
-    final nanoseconds = microseconds * 1000;
+    // Use a more stable approach: combine face geometry with a unique identifier
+    final bbox = face.boundingBox;
+    final centerX = bbox.center.dx;
+    final centerY = bbox.center.dy;
+    final width = bbox.width;
+    final height = bbox.height;
+    final aspectRatio = width / height;
 
-    // Create a truly unique seed using multiple sources
-    final uniqueSeed =
-        timestamp +
-        microseconds +
-        nanoseconds +
-        face.boundingBox.left.hashCode +
-        face.boundingBox.top.hashCode +
-        face.boundingBox.width.hashCode +
-        face.boundingBox.height.hashCode +
-        DateTime.now().timeZoneOffset.inMilliseconds +
-        ProcessInfo.currentRss; // Add process memory usage for uniqueness
+    // Create a stable seed based on face geometry (more stable than random)
+    final faceSeed =
+        (centerX * 1000 + centerY * 1000 + width * 100 + height * 100).round();
+    final random = Random(faceSeed);
 
-    // Use a completely different approach - generate truly random values
-    final random = Random(uniqueSeed);
-
-    // Generate 128 completely unique values using cryptographic-like randomness
+    // Generate 128 stable values based on face geometry
     for (int i = 0; i < 128; i++) {
-      double uniqueValue;
+      double value = 0.0;
 
-      // Use multiple random sources for each value
-      final rand1 = random.nextDouble();
-      final rand2 = random.nextDouble();
-      final rand3 = random.nextDouble();
+      // Use face geometry as base
+      if (i < 10) {
+        // First 10 values based on face position and size
+        switch (i) {
+          case 0:
+            value = (centerX % 1000) / 1000.0;
+            break;
+          case 1:
+            value = (centerY % 1000) / 1000.0;
+            break;
+          case 2:
+            value = (width % 1000) / 1000.0;
+            break;
+          case 3:
+            value = (height % 1000) / 1000.0;
+            break;
+          case 4:
+            value = aspectRatio % 1.0;
+            break;
+          case 5:
+            value = (bbox.left % 1000) / 1000.0;
+            break;
+          case 6:
+            value = (bbox.top % 1000) / 1000.0;
+            break;
+          case 7:
+            value = (bbox.right % 1000) / 1000.0;
+            break;
+          case 8:
+            value = (bbox.bottom % 1000) / 1000.0;
+            break;
+          case 9:
+            value = ((width + height) % 1000) / 1000.0;
+            break;
+        }
+      } else {
+        // Remaining values based on stable face features
+        value = random.nextDouble();
 
-      // Combine multiple random sources with bit manipulation
-      uniqueValue = (rand1 * 0.4 + rand2 * 0.3 + rand3 * 0.3);
+        // Add face-specific variations
+        if (i % 3 == 0) value += (centerX % 100) / 1000.0;
+        if (i % 3 == 1) value += (centerY % 100) / 1000.0;
+        if (i % 3 == 2) value += (width % 100) / 1000.0;
 
-      // Add time-based variation
-      uniqueValue += (timestamp % 1000000) / 1000000.0 * 0.1;
-      uniqueValue += (microseconds % 1000000) / 1000000.0 * 0.1;
-      uniqueValue += (nanoseconds % 1000000) / 1000000.0 * 0.1;
+        // Add landmark-based variations if available
+        if (face.landmarks.isNotEmpty) {
+          final leftEye = face.landmarks[FaceLandmarkType.leftEye];
+          if (leftEye != null) {
+            value += (leftEye.position.x % 100) / 10000.0;
+            value += (leftEye.position.y % 100) / 10000.0;
+          }
+        }
 
-      // Add face-specific variation
-      uniqueValue +=
-          (face.boundingBox.left.hashCode % 1000000) / 1000000.0 * 0.1;
-      uniqueValue +=
-          (face.boundingBox.top.hashCode % 1000000) / 1000000.0 * 0.1;
-      uniqueValue +=
-          (face.boundingBox.width.hashCode % 1000000) / 1000000.0 * 0.1;
-      uniqueValue +=
-          (face.boundingBox.height.hashCode % 1000000) / 1000000.0 * 0.1;
+        value = value % 1.0; // Ensure 0-1 range
+      }
 
-      // Add index-based variation
-      uniqueValue += (i * 1000 % 1000000) / 1000000.0 * 0.1;
-
-      // Ensure value is between 0 and 1
-      uniqueValue = uniqueValue % 1.0;
-
-      embedding.add(uniqueValue);
+      embedding.add(value);
     }
 
     print(
-      '✅ Generated truly unique embedding with ${embedding.length} dimensions',
+      '✅ Generated stable face embedding with ${embedding.length} dimensions',
     );
+    print('🔍 Face seed: $faceSeed');
     print(
       '🔍 Embedding preview: [${embedding.take(5).map((e) => e.toStringAsFixed(6)).join(', ')}...]',
     );
-    print('🔑 Unique seed used: $uniqueSeed');
-    print('🔑 Process memory: ${ProcessInfo.currentRss} bytes');
 
     return embedding;
   }

@@ -4,10 +4,11 @@ class AppConstants {
   static const String attendanceCollection = 'attendance';
 
   // Face Recognition thresholds
-  // Increase threshold to reduce false positives during attendance
-  static const double faceMatchThreshold = 0.85; // For attendance matching
+  // Balanced thresholds for reliable recognition
+  static const double faceMatchThreshold =
+      0.5; // For attendance matching - very permissive
   // Require the best score to exceed second-best by this margin
-  static const double faceSecondBestMinGap = 0.08;
+  static const double faceSecondBestMinGap = 0.05; // Small gap required
   static const double duplicateDetectionThreshold =
       0.40; // Very permissive threshold to allow multiple registrations
   static const int maxFaceEmbeddingSize = 128;

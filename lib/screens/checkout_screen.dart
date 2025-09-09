@@ -122,8 +122,21 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
       final bool passesGap =
           bestScore - secondBestScore >= AppConstants.faceSecondBestMinGap;
 
+      print('🔍 Face recognition scores:');
+      print(
+        '   Best score: ${bestScore.toStringAsFixed(4)} (threshold: ${AppConstants.faceMatchThreshold})',
+      );
+      print('   Second best: ${secondBestScore.toStringAsFixed(4)}');
+      print(
+        '   Gap: ${(bestScore - secondBestScore).toStringAsFixed(4)} (required: ${AppConstants.faceSecondBestMinGap})',
+      );
+      print('   Passes threshold: $passesThreshold');
+      print('   Passes gap: $passesGap');
+
       if (bestEmployee == null || !passesThreshold || !passesGap) {
-        _showError('Face not recognized with sufficient confidence');
+        _showError(
+          'Face not recognized with sufficient confidence (Score: ${bestScore.toStringAsFixed(3)})',
+        );
         return;
       }
 

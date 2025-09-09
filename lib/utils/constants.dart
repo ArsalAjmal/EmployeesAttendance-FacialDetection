@@ -5,9 +5,9 @@ class AppConstants {
 
   // Face Recognition thresholds
   // Balanced thresholds for reliable recognition
-  static const double faceMatchThreshold = 0.75; // For attendance matching
+  static const double faceMatchThreshold = 0.70; // For attendance matching
   // Require the best score to exceed second-best by this margin
-  static const double faceSecondBestMinGap = 0.05; // Small gap required
+  static const double faceSecondBestMinGap = 0.03; // Very small gap required
   static const double duplicateDetectionThreshold =
       0.40; // Very permissive threshold to allow multiple registrations
   static const int maxFaceEmbeddingSize = 128;

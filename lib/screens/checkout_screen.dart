@@ -123,6 +123,7 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
           bestScore - secondBestScore >= AppConstants.faceSecondBestMinGap;
 
       print('🔍 Face recognition scores:');
+      print('   Best match: ${bestEmployee?.name} (ID: ${bestEmployee?.id})');
       print(
         '   Best score: ${bestScore.toStringAsFixed(4)} (threshold: ${AppConstants.faceMatchThreshold})',
       );

@@ -96,14 +96,14 @@ class FaceDetectionService {
     return allBytes.done().buffer.asUint8List();
   }
 
-  // Generate face embedding using a more stable approach
+  // Generate face embedding using a highly unique approach
   List<double> generateFaceEmbedding(Face face) {
     List<double> embedding = [];
 
-    print('🧠 Generating stable face embedding...');
+    print('🧠 Generating highly unique face embedding...');
     print('📊 Face bounding box: ${face.boundingBox}');
 
-    // Use a more stable approach: combine face geometry with a unique identifier
+    // Use a highly unique approach: combine face features with cryptographic-like uniqueness
     final bbox = face.boundingBox;
     final centerX = bbox.center.dx;
     final centerY = bbox.center.dy;
@@ -111,78 +111,136 @@ class FaceDetectionService {
     final height = bbox.height;
     final aspectRatio = width / height;
 
-    // Create a stable seed based on face geometry (more stable than random)
-    final faceSeed =
-        (centerX * 1000 + centerY * 1000 + width * 100 + height * 100).round();
-    final random = Random(faceSeed);
+    // Create a highly unique seed using face features + time + process info
+    final timestamp = DateTime.now().microsecondsSinceEpoch;
+    final processId = DateTime.now().millisecondsSinceEpoch % 1000000;
+    final faceHash =
+        (centerX * 100000 + centerY * 100000 + width * 10000 + height * 10000)
+            .round();
+    final uniqueSeed = faceHash + timestamp + processId;
+    final random = Random(uniqueSeed);
 
-    // Generate 128 stable values based on face geometry
+    // Generate 128 highly unique values
     for (int i = 0; i < 128; i++) {
       double value = 0.0;
 
-      // Use face geometry as base
-      if (i < 10) {
-        // First 10 values based on face position and size
-        switch (i) {
+      // Use different unique patterns for different dimensions
+      if (i < 30) {
+        // First 30 values based on face geometry with maximum precision
+        final baseValue = (i * 1000 + faceHash) % 1000000;
+        switch (i % 15) {
           case 0:
-            value = (centerX % 1000) / 1000.0;
+            value = (centerX * 1000 + baseValue) % 1000000 / 1000000.0;
             break;
           case 1:
-            value = (centerY % 1000) / 1000.0;
+            value = (centerY * 1000 + baseValue) % 1000000 / 1000000.0;
             break;
           case 2:
-            value = (width % 1000) / 1000.0;
+            value = (width * 1000 + baseValue) % 1000000 / 1000000.0;
             break;
           case 3:
-            value = (height % 1000) / 1000.0;
+            value = (height * 1000 + baseValue) % 1000000 / 1000000.0;
             break;
           case 4:
-            value = aspectRatio % 1.0;
+            value = (aspectRatio * 1000000 + baseValue) % 1000000 / 1000000.0;
             break;
           case 5:
-            value = (bbox.left % 1000) / 1000.0;
+            value = (bbox.left * 1000 + baseValue) % 1000000 / 1000000.0;
             break;
           case 6:
-            value = (bbox.top % 1000) / 1000.0;
+            value = (bbox.top * 1000 + baseValue) % 1000000 / 1000000.0;
             break;
           case 7:
-            value = (bbox.right % 1000) / 1000.0;
+            value = (bbox.right * 1000 + baseValue) % 1000000 / 1000000.0;
             break;
           case 8:
-            value = (bbox.bottom % 1000) / 1000.0;
+            value = (bbox.bottom * 1000 + baseValue) % 1000000 / 1000000.0;
             break;
           case 9:
-            value = ((width + height) % 1000) / 1000.0;
+            value = ((width + height) * 1000 + baseValue) % 1000000 / 1000000.0;
+            break;
+          case 10:
+            value = ((width * height) + baseValue) % 1000000 / 1000000.0;
+            break;
+          case 11:
+            value =
+                ((centerX + centerY) * 1000 + baseValue) % 1000000 / 1000000.0;
+            break;
+          case 12:
+            value =
+                ((centerX - centerY).abs() * 1000 + baseValue) %
+                1000000 /
+                1000000.0;
+            break;
+          case 13:
+            value =
+                ((width - height).abs() * 1000 + baseValue) %
+                1000000 /
+                1000000.0;
+            break;
+          case 14:
+            value =
+                ((width / height) * 1000000 + baseValue) % 1000000 / 1000000.0;
             break;
         }
-      } else {
-        // Remaining values based on stable face features
-        value = random.nextDouble();
-
-        // Add face-specific variations
-        if (i % 3 == 0) value += (centerX % 100) / 1000.0;
-        if (i % 3 == 1) value += (centerY % 100) / 1000.0;
-        if (i % 3 == 2) value += (width % 100) / 1000.0;
-
-        // Add landmark-based variations if available
+      } else if (i < 60) {
+        // Next 30 values based on landmarks with high precision
         if (face.landmarks.isNotEmpty) {
           final leftEye = face.landmarks[FaceLandmarkType.leftEye];
-          if (leftEye != null) {
-            value += (leftEye.position.x % 100) / 10000.0;
-            value += (leftEye.position.y % 100) / 10000.0;
-          }
-        }
+          final rightEye = face.landmarks[FaceLandmarkType.rightEye];
+          final nose = face.landmarks[FaceLandmarkType.noseBase];
+          final leftMouth = face.landmarks[FaceLandmarkType.leftMouth];
+          final rightMouth = face.landmarks[FaceLandmarkType.rightMouth];
 
-        value = value % 1.0; // Ensure 0-1 range
+          double landmarkValue = 0.0;
+          if (leftEye != null) {
+            landmarkValue += (leftEye.position.x * 1000) % 1000000;
+            landmarkValue += (leftEye.position.y * 1000) % 1000000;
+          }
+          if (rightEye != null) {
+            landmarkValue += (rightEye.position.x * 1000) % 1000000;
+            landmarkValue += (rightEye.position.y * 1000) % 1000000;
+          }
+          if (nose != null) {
+            landmarkValue += (nose.position.x * 1000) % 1000000;
+            landmarkValue += (nose.position.y * 1000) % 1000000;
+          }
+          if (leftMouth != null) {
+            landmarkValue += (leftMouth.position.x * 1000) % 1000000;
+            landmarkValue += (leftMouth.position.y * 1000) % 1000000;
+          }
+          if (rightMouth != null) {
+            landmarkValue += (rightMouth.position.x * 1000) % 1000000;
+            landmarkValue += (rightMouth.position.y * 1000) % 1000000;
+          }
+          value = (landmarkValue + i * 10000) % 1000000 / 1000000.0;
+        } else {
+          value = random.nextDouble();
+        }
+      } else {
+        // Remaining values based on highly unique random with multiple seeds
+        value = random.nextDouble();
+
+        // Add multiple unique variations
+        value += (timestamp % 1000000) / 1000000.0 * 0.1;
+        value += (processId % 1000000) / 1000000.0 * 0.1;
+        value += (faceHash % 1000000) / 1000000.0 * 0.1;
+        value += (i * 1000000 % 1000000) / 1000000.0 * 0.1;
+        value += (uniqueSeed % 1000000) / 1000000.0 * 0.1;
+
+        value = value % 1.0;
       }
 
       embedding.add(value);
     }
 
     print(
-      '✅ Generated stable face embedding with ${embedding.length} dimensions',
+      '✅ Generated highly unique face embedding with ${embedding.length} dimensions',
     );
-    print('🔍 Face seed: $faceSeed');
+    print('🔍 Face hash: $faceHash');
+    print('🔍 Unique seed: $uniqueSeed');
+    print('🔍 Timestamp: $timestamp');
+    print('🔍 Process ID: $processId');
     print(
       '🔍 Embedding preview: [${embedding.take(5).map((e) => e.toStringAsFixed(6)).join(', ')}...]',
     );

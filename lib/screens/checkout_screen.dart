@@ -141,49 +141,61 @@ class _CheckOutScreenState extends State<CheckOutScreen> {
         return;
       }
 
-      // Ask for confirmation to avoid misidentification
-      final confirmed =
-          await showDialog<bool>(
-            context: context,
-            builder:
-                (context) => AlertDialog(
-                  title: Text('Confirm Identity'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Recognized as: ${bestEmployee?.name ?? 'Unknown'}'),
-                      SizedBox(height: 4),
-                      Text(
-                        'Employee ID: ${bestEmployee?.id ?? '-'}',
-                        style: TextStyle(color: Colors.black54, fontSize: 12),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Match score: ${bestScore.toStringAsFixed(3)}',
-                        style: TextStyle(color: Colors.black45, fontSize: 12),
-                      ),
-                    ],
+      // Allow operator to pick from top matches to avoid misidentification
+      final List<MapEntry<Employee, double>> scored = [];
+      for (final emp in _employees) {
+        final samples =
+            (emp.faceEmbeddings.isNotEmpty)
+                ? emp.faceEmbeddings
+                : (emp.faceEmbedding.isNotEmpty
+                    ? [emp.faceEmbedding]
+                    : <List<double>>[]);
+        if (samples.isEmpty) continue;
+        double bestForEmp = -1.0;
+        for (final sample in samples) {
+          final s = _faceDetectionService.compareFaces(liveEmbedding, sample);
+          if (s > bestForEmp) bestForEmp = s;
+        }
+        scored.add(MapEntry(emp, bestForEmp));
+      }
+      scored.sort((a, b) => b.value.compareTo(a.value));
+      final top = scored.take(3).toList();
+
+      final Employee? selected = await showDialog<Employee>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text('Confirm Employee'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Top matches:'),
+                SizedBox(height: 8),
+                ...top.map(
+                  (e) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${e.key.name} (${e.key.id})'),
+                    subtitle: Text('Score: ${e.value.toStringAsFixed(3)}'),
+                    onTap: () => Navigator.of(context).pop(e.key),
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: Text('Not me'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: Text('Yes, proceed'),
-                    ),
-                  ],
                 ),
-          ) ??
-          false;
-      if (!confirmed) {
-        _showError(
-          'Check-out cancelled. Face did not match the correct person.',
-        );
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(null),
+                child: Text('Cancel'),
+              ),
+            ],
+          );
+        },
+      );
+      if (selected == null) {
+        _showError('Check-out cancelled. Please try again.');
         return;
       }
+      bestEmployee = selected;
 
       // Check if this employee has checked in today
       print(

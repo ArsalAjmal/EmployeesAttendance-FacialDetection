@@ -96,155 +96,108 @@ class FaceDetectionService {
     return allBytes.done().buffer.asUint8List();
   }
 
-  // Generate face embedding using a highly unique approach
+  // Generate face embedding deterministically from normalized geometry and landmarks
   List<double> generateFaceEmbedding(Face face) {
-    List<double> embedding = [];
+    final List<double> features = [];
 
-    print('🧠 Generating highly unique face embedding...');
-    print('📊 Face bounding box: ${face.boundingBox}');
-
-    // Use a highly unique approach: combine face features with cryptographic-like uniqueness
+    // Normalize all coordinates by bounding box to reduce scale/translation effects
     final bbox = face.boundingBox;
-    final centerX = bbox.center.dx;
-    final centerY = bbox.center.dy;
-    final width = bbox.width;
-    final height = bbox.height;
-    final aspectRatio = width / height;
+    final double bx = bbox.left;
+    final double by = bbox.top;
+    final double bw = max(bbox.width, 1.0);
+    final double bh = max(bbox.height, 1.0);
 
-    // Create a highly unique seed using face features + time + process info
-    final timestamp = DateTime.now().microsecondsSinceEpoch;
-    final processId = DateTime.now().millisecondsSinceEpoch % 1000000;
-    final faceHash =
-        (centerX * 100000 + centerY * 100000 + width * 10000 + height * 10000)
-            .round();
-    final uniqueSeed = faceHash + timestamp + processId;
-    final random = Random(uniqueSeed);
+    double nx(double x) => (x - bx) / bw; // 0..1
+    double ny(double y) => (y - by) / bh; // 0..1
 
-    // Generate 128 highly unique values
-    for (int i = 0; i < 128; i++) {
-      double value = 0.0;
+    // Aspect ratio
+    features.add(bw / bh);
 
-      // Use different unique patterns for different dimensions
-      if (i < 30) {
-        // First 30 values based on face geometry with maximum precision
-        final baseValue = (i * 1000 + faceHash) % 1000000;
-        switch (i % 15) {
-          case 0:
-            value = (centerX * 1000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 1:
-            value = (centerY * 1000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 2:
-            value = (width * 1000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 3:
-            value = (height * 1000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 4:
-            value = (aspectRatio * 1000000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 5:
-            value = (bbox.left * 1000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 6:
-            value = (bbox.top * 1000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 7:
-            value = (bbox.right * 1000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 8:
-            value = (bbox.bottom * 1000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 9:
-            value = ((width + height) * 1000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 10:
-            value = ((width * height) + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 11:
-            value =
-                ((centerX + centerY) * 1000 + baseValue) % 1000000 / 1000000.0;
-            break;
-          case 12:
-            value =
-                ((centerX - centerY).abs() * 1000 + baseValue) %
-                1000000 /
-                1000000.0;
-            break;
-          case 13:
-            value =
-                ((width - height).abs() * 1000 + baseValue) %
-                1000000 /
-                1000000.0;
-            break;
-          case 14:
-            value =
-                ((width / height) * 1000000 + baseValue) % 1000000 / 1000000.0;
-            break;
-        }
-      } else if (i < 60) {
-        // Next 30 values based on landmarks with high precision
-        if (face.landmarks.isNotEmpty) {
-          final leftEye = face.landmarks[FaceLandmarkType.leftEye];
-          final rightEye = face.landmarks[FaceLandmarkType.rightEye];
-          final nose = face.landmarks[FaceLandmarkType.noseBase];
-          final leftMouth = face.landmarks[FaceLandmarkType.leftMouth];
-          final rightMouth = face.landmarks[FaceLandmarkType.rightMouth];
+    // Landmarks of interest
+    final leftEye = face.landmarks[FaceLandmarkType.leftEye]?.position;
+    final rightEye = face.landmarks[FaceLandmarkType.rightEye]?.position;
+    final nose = face.landmarks[FaceLandmarkType.noseBase]?.position;
+    final leftMouth = face.landmarks[FaceLandmarkType.leftMouth]?.position;
+    final rightMouth = face.landmarks[FaceLandmarkType.rightMouth]?.position;
 
-          double landmarkValue = 0.0;
-          if (leftEye != null) {
-            landmarkValue += (leftEye.position.x * 1000) % 1000000;
-            landmarkValue += (leftEye.position.y * 1000) % 1000000;
-          }
-          if (rightEye != null) {
-            landmarkValue += (rightEye.position.x * 1000) % 1000000;
-            landmarkValue += (rightEye.position.y * 1000) % 1000000;
-          }
-          if (nose != null) {
-            landmarkValue += (nose.position.x * 1000) % 1000000;
-            landmarkValue += (nose.position.y * 1000) % 1000000;
-          }
-          if (leftMouth != null) {
-            landmarkValue += (leftMouth.position.x * 1000) % 1000000;
-            landmarkValue += (leftMouth.position.y * 1000) % 1000000;
-          }
-          if (rightMouth != null) {
-            landmarkValue += (rightMouth.position.x * 1000) % 1000000;
-            landmarkValue += (rightMouth.position.y * 1000) % 1000000;
-          }
-          value = (landmarkValue + i * 10000) % 1000000 / 1000000.0;
-        } else {
-          value = random.nextDouble();
-        }
+    // Helper to push normalized point
+    void pushPoint(Point<int>? p) {
+      if (p == null) {
+        features.addAll([0.0, 0.0]);
       } else {
-        // Remaining values based on highly unique random with multiple seeds
-        value = random.nextDouble();
-
-        // Add multiple unique variations
-        value += (timestamp % 1000000) / 1000000.0 * 0.1;
-        value += (processId % 1000000) / 1000000.0 * 0.1;
-        value += (faceHash % 1000000) / 1000000.0 * 0.1;
-        value += (i * 1000000 % 1000000) / 1000000.0 * 0.1;
-        value += (uniqueSeed % 1000000) / 1000000.0 * 0.1;
-
-        value = value % 1.0;
+        features.add(nx(p.x.toDouble()));
+        features.add(ny(p.y.toDouble()));
       }
-
-      embedding.add(value);
     }
 
-    print(
-      '✅ Generated highly unique face embedding with ${embedding.length} dimensions',
-    );
-    print('🔍 Face hash: $faceHash');
-    print('🔍 Unique seed: $uniqueSeed');
-    print('🔍 Timestamp: $timestamp');
-    print('🔍 Process ID: $processId');
-    print(
-      '🔍 Embedding preview: [${embedding.take(5).map((e) => e.toStringAsFixed(6)).join(', ')}...]',
-    );
+    pushPoint(leftEye);
+    pushPoint(rightEye);
+    pushPoint(nose);
+    pushPoint(leftMouth);
+    pushPoint(rightMouth);
 
+    // Distances normalized by bbox diagonal
+    double diag = sqrt(bw * bw + bh * bh);
+    double nd(Point<int>? a, Point<int>? b) {
+      if (a == null || b == null) return 0.0;
+      final dx = (a.x - b.x).toDouble();
+      final dy = (a.y - b.y).toDouble();
+      return sqrt(dx * dx + dy * dy) / max(diag, 1.0);
+    }
+
+    features.add(nd(leftEye, rightEye)); // inter-ocular distance
+    features.add(nd(nose, leftEye));
+    features.add(nd(nose, rightEye));
+    features.add(nd(leftMouth, rightMouth));
+    features.add(nd(nose, leftMouth));
+    features.add(nd(nose, rightMouth));
+
+    // Eye line angle (cos,sin) to be rotation-aware but bounded
+    if (leftEye != null && rightEye != null) {
+      final ex = (rightEye.x - leftEye.x).toDouble();
+      final ey = (rightEye.y - leftEye.y).toDouble();
+      final angle = atan2(ey, ex); // -pi..pi
+      features.add(cos(angle));
+      features.add(sin(angle));
+    } else {
+      features.addAll([0.0, 0.0]);
+    }
+
+    // Contour complexity (normalized length of face contour)
+    final contour = face.contours[FaceContourType.face];
+    if (contour != null && contour.points.isNotEmpty) {
+      double sum = 0.0;
+      for (int i = 1; i < contour.points.length; i++) {
+        final a = contour.points[i - 1];
+        final b = contour.points[i];
+        final dx = (a.x - b.x).toDouble();
+        final dy = (a.y - b.y).toDouble();
+        sum += sqrt(dx * dx + dy * dy);
+      }
+      features.add(sum / max(diag, 1.0));
+    } else {
+      features.add(0.0);
+    }
+
+    // Classification probabilities
+    features.add(face.smilingProbability ?? 0.0);
+    features.add(face.leftEyeOpenProbability ?? 0.0);
+    features.add(face.rightEyeOpenProbability ?? 0.0);
+
+    // Deterministic expansion to fixed 128 dims using simple polynomial hashes
+    // This ensures no randomness/time-based noise.
+    List<double> embedding = List<double>.from(features);
+    double hash = 0.0;
+    for (final v in features) {
+      hash = (hash * 1667.0 + v * 1000.0) % 100000.0;
+    }
+    while (embedding.length < 128) {
+      hash = (hash * 48271.0 + 31.0) % 100000.0;
+      embedding.add((hash % 1000.0) / 1000.0); // 0..1 deterministic filler
+    }
+    if (embedding.length > 128) embedding = embedding.sublist(0, 128);
+
+    print('✅ Generated deterministic embedding with ${embedding.length} dims');
     return embedding;
   }
 

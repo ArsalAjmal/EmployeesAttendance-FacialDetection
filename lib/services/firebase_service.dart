@@ -59,6 +59,7 @@ class FirebaseService {
         name: employee.name,
         faceImageUrl: base64Image, // Store base64 data instead of URL
         faceEmbedding: employee.faceEmbedding,
+        faceEmbeddings: employee.faceEmbeddings,
         createdAt: employee.createdAt,
         isActive: employee.isActive,
       );

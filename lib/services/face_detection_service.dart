@@ -46,37 +46,18 @@ class FaceDetectionService {
       final faces = await _faceDetector.processImage(inputImage);
       print('👥 Face detection completed: ${faces.length} faces found');
 
-      // Filter out faces that are too small or have insufficient features (likely false positives)
+      // Relaxed filtering: accept smaller faces and fewer features
       final validFaces =
           faces.where((face) {
             final faceArea = face.boundingBox.width * face.boundingBox.height;
-            final minArea = 10000; // Minimum 100x100 pixels
-            final hasEnoughLandmarks =
-                face.landmarks.length >= 5; // At least 5 landmarks
-            final hasEnoughContours =
-                face.contours.length >= 3; // At least 3 contours
-
-            final isValid =
-                faceArea >= minArea && hasEnoughLandmarks && hasEnoughContours;
-
+            final minArea = 6000; // ~77x77 pixels
+            final hasEnoughLandmarks = face.landmarks.length >= 3;
+            final isValid = faceArea >= minArea && hasEnoughLandmarks;
             if (!isValid) {
-              if (faceArea < minArea) {
-                print(
-                  '⚠️ Filtered out small face: ${face.boundingBox.width}x${face.boundingBox.height} = $faceArea pixels',
-                );
-              }
-              if (!hasEnoughLandmarks) {
-                print(
-                  '⚠️ Filtered out face with insufficient landmarks: ${face.landmarks.length} < 5',
-                );
-              }
-              if (!hasEnoughContours) {
-                print(
-                  '⚠️ Filtered out face with insufficient contours: ${face.contours.length} < 3',
-                );
-              }
+              print(
+                '⚠️ Filtered: area=${face.boundingBox.width}x${face.boundingBox.height}=${faceArea.toStringAsFixed(0)}, landmarks=${face.landmarks.length}',
+              );
             }
-
             return isValid;
           }).toList();
 

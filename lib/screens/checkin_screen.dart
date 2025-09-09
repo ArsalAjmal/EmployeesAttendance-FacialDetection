@@ -96,22 +96,29 @@ class _CheckInScreenState extends State<CheckInScreen> {
         faces.first,
       );
 
-      // Find best and second-best matches among employees
+      // Find best and second-best matches among employees (use all samples)
       double bestScore = -1.0;
       double secondBestScore = -1.0;
       Employee? bestEmployee;
       for (final emp in _employees) {
-        if (emp.faceEmbedding.isEmpty) continue;
-        final score = _faceDetectionService.compareFaces(
-          liveEmbedding,
-          emp.faceEmbedding,
-        );
-        if (score > bestScore) {
+        final samples =
+            (emp.faceEmbeddings.isNotEmpty)
+                ? emp.faceEmbeddings
+                : (emp.faceEmbedding.isNotEmpty
+                    ? [emp.faceEmbedding]
+                    : <List<double>>[]);
+        if (samples.isEmpty) continue;
+        double bestForEmp = -1.0;
+        for (final sample in samples) {
+          final s = _faceDetectionService.compareFaces(liveEmbedding, sample);
+          if (s > bestForEmp) bestForEmp = s;
+        }
+        if (bestForEmp > bestScore) {
           secondBestScore = bestScore;
-          bestScore = score;
+          bestScore = bestForEmp;
           bestEmployee = emp;
-        } else if (score > secondBestScore) {
-          secondBestScore = score;
+        } else if (bestForEmp > secondBestScore) {
+          secondBestScore = bestForEmp;
         }
       }
 
